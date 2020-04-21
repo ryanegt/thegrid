@@ -11,6 +11,8 @@
 */
 pixel * frames[3][GRIDW*GRIDL];
 pixel * gridFrame[GRIDW*GRIDL];
+
+// References to hardwared
 LEDStrip *strips[5];
 MultiSPI *spi;
 
@@ -29,13 +31,13 @@ void engineInit(void) {
     // Init virtual frames to transparent black
     for(int f = 0; f < 3; ++f) {
         for(int p = 0; p < GRIDW*GRIDL; ++p) {
-            frames[f][p] = new pixel({0,0,0,0});
+            frames[f][p] = new pixel({0,0,0,0.0});
         }
     }
 
     // Init output frame to transparent black
     for(int p = 0; p < GRIDW*GRIDL; ++p) {
-        gridFrame[p] = new pixel({0,0,0,0.0});
+        gridFrame[p] = new pixel({0,0,0,1.0});
     }
 }
 
@@ -44,41 +46,52 @@ void engineInit(void) {
 * frames into one output frame and send it to
 * the grid hardware.
 */
-void renderGrid() {
+void renderGrid(void) {
     int px = 0;
+    pixel * blendPix;
     for(int j = 0; j < GRIDW; ++j) {
         for(int i = 0; i < GRIDL; ++i) {
             for(int f = 0; f < 3; ++f) {
-                blendPixelColor(gridFrame[px], frames[f][px]);
+                blendPix = blendPixelColor(gridFrame[px], frames[f][px]);
+                gridFrame[px] = blendPix;
+                // delete blendPix;
             }
+            // printf("Setting pix %d to (%d,%d,%d,%f)\n",px,gridFrame[px]->r,gridFrame[px]->g,gridFrame[px]->b,gridFrame[px]->a);
             strips[j]->SetPixel(i, pixelToRgb(gridFrame[px]));
             px++;
         }
     }
+    spi->SendBuffers();
+    return;
+}
+
+void clearGrid(void) {
+    for(int f=0; f < 3; ++f) {
+        for(int p=0; p < GRIDW*GRIDL; ++p) {
+            frames[f][p]->r = 0;
+            frames[f][p]->g = 0;
+            frames[f][p]->b = 0;
+        }
+    }
+    return;
 }
 
 /*
 * Interpolate color of laying a pixel on top of another
 */
-void blendPixelColor(pixel * bottom, pixel * top) {
-    printf("Blend pixel from: %d to %d\n",bottom->b, top->b);
+pixel * blendPixelColor(pixel * bottom, pixel * top) {
+    // printf("Blend pixel from: %d to %d\n",bottom->b, top->b);
     // Save ourself some compute cycles
     // If bottom is v transparent
-    if(bottom->a < 3 || top->a > 253) {
-        bottom = top;
-        return;
-    }
-    // When no top is passed or v transparetn
-    if(top->a < 3)
-        return;
-
-    bottom->r = ceil(bottom->r+((top->r-bottom->r)*top->a)); // red
-    bottom->g = ceil(bottom->g+((top->g-bottom->g)*top->a)); // green
-    bottom->g = ceil(bottom->b+((top->b-bottom->b)*top->a)); // blue
-    bottom->a = bottom->a; // preserve first layer alpha...
-    return;
+    int r = ceil(bottom->r+((top->r-bottom->r)*top->a)); // red
+    int g = ceil(bottom->g+((top->g-bottom->g)*top->a)); // green
+    int b = ceil(bottom->b+((top->b-bottom->b)*top->a)); // blue
+    float a = bottom->a; // preserve first layer alpha...
+    return new pixel({r,g,b,a});
 }
 
 int pixelToRgb(pixel * pix) {
-    return 0;
+    return ceil(pix->r*(pow(256,2))*pix->a)
+        + ceil((pix->g*256)*pix->a)
+        + ceil(pix->b*pix->a);
 }

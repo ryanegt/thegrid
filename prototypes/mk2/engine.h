@@ -22,5 +22,5 @@ extern pixel * frames[][GRIDW*GRIDL];
 // Forward function declarations
 void engineInit(void);
 void renderGrid(void);
-void blendPixelColor(pixel * bottom, pixel * top);
+pixel * blendPixelColor(pixel * bottom, pixel * top);
 int pixelToRgb(pixel * pix);
